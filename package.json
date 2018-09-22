@@ -2,6 +2,10 @@
   "name": "cfik",
   "version": "1.0.0",
   "description": "Project boiler plate.",
+  "repository": {
+    "type": "git",
+    "url": "https://petr_brabec@bitbucket.org/petr_brabec/cfik.git"
+  },
   "main": "index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
