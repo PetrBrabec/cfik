@@ -7,7 +7,9 @@ interface IContainerOptions {
     name: string;
     machineName: string;
 
+    hashPaths?: boolean;
     entryElementId?: string;
+    modalUriString?: string;
 
     route: IRouteOptions;
 }
@@ -21,7 +23,9 @@ class ContainerOptions implements IContainerOptions {
         }
     }
 
+    public hashPaths: boolean = false;
     public entryElementId: string = "app";
+    public modalUriString: string = "modal";
     public machineName: string;
     public name: string;
     public route: IRouteOptions;

@@ -8,7 +8,7 @@
         "jsx": "react",
         "experimentalDecorators": true
     },
-    "include": [
-        "./source/**/*"
+    "exclude": [
+        "node_modules",
     ]
 }

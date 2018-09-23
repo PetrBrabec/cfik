@@ -1,13 +1,12 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import { action, computed } from "mobx";
 
 import { PageConstructor } from "./Page";
-import { LayoutConstructor, Layout } from "./Layout/Layout";
+import { LayoutConstructor, Layout } from "./Layout";
 import { Container } from "./Container";
-import { IModalOptions } from "./Modal/Modal";
+import { IModalRouteOptions, ModalRoute } from "./ModalRoute";
 
-type TMatch = (path: string) => Route | undefined;
+type TMatch = () => Route | undefined;
 
 export class RouteOptions implements IRouteOptions {
     public path: string;
@@ -17,11 +16,11 @@ export class RouteOptions implements IRouteOptions {
     public component: PageConstructor;
     public match?: TMatch;
     public children?: Array<IRouteOptions>;
-    public modals?: Array<IModalOptions>;
+    public modals?: Array<IModalRouteOptions>;
     public notFound?: IRouteOptions;
     public container?: Container;
     public parent?: Route;
-    public top?: Route;
+    public topRoute?: Route;
 
     public isTopRoute(): this is ITopRouteOptions {
         return this.container != undefined;
@@ -40,28 +39,26 @@ export interface IRouteOptions {
     component?: PageConstructor;
     match?: TMatch;
     children?: Array<IRouteOptions>;
-    modals?: Array<IModalOptions>;
+    modals?: Array<IModalRouteOptions>;
     notFound?: IRouteOptions;
 }
 
 export interface ITopRouteOptions {
     container: Container;
-    component: PageConstructor;
 }
 
 export interface IChildrenRouteOptions {
     parent: Route;
-    top: Route;
+    topRoute: Route;
 }
-
-const MODAL_URI_STRING = "modal"
 
 export class Route {
     public constructor(options: (IRouteOptions & (IChildrenRouteOptions | ITopRouteOptions))) {
         const o = Object.assign(new RouteOptions(), options);
 
         this.render = this.render.bind(this);
-        this.closeModal = this.closeModal.bind(this);
+        this.open = this.open.bind(this);
+        this.replace = this.replace.bind(this);
         this.component = options.component;
         this.isExternal = options.isExternal;
         this.path = options.path;
@@ -91,9 +88,9 @@ export class Route {
         }
         else if (o.isChildrenRoute()) {
             getter("parent", o.parent);
-            inherit("top");
+            inherit("topRoute");
             inherit("container");
-            this.fullPath = this.parent.fullPath + this.path;
+            this.fullPath = this.parent.fullPath + (this.parent.fullPath == "/" ? "" : "/") + this.path;
         }
 
         // layout
@@ -126,7 +123,7 @@ export class Route {
             this.children = options.children.map(
                 (child: IRouteOptions & IChildrenRouteOptions) => {
                     child.parent = this;
-                    child.top = this.top;
+                    child.topRoute = this.topRoute;
 
                     return new Route(child);
                 }
@@ -137,7 +134,13 @@ export class Route {
         if (options.modals != undefined) {
             this.modals = options.modals.map(
                 (modal) => {
-                    return modal;
+                    return new ModalRoute({
+                        machineName: modal.machineName,
+                        title: modal.title,
+                        component: modal.component,
+                        container: this.container,
+                        topRoute: this.topRoute
+                    });
                 }
             )
         }
@@ -149,10 +152,10 @@ export class Route {
     public layout?: LayoutConstructor;
     public component?: PageConstructor;
     public children?: Array<Route>;
-    public modals?: Array<IModalOptions>;
+    public modals?: Array<ModalRoute>;
     public notFound: Route;
 
-    public get top(): Route {
+    public get topRoute(): Route {
         return this;
     }
 
@@ -169,8 +172,8 @@ export class Route {
     }
 
     public pathWithoutModal(originalPath: string): string {
-        let path = originalPath.replace("#/", "");
-        const modalIndex = path.indexOf(`/${MODAL_URI_STRING}`);
+        let path = originalPath;
+        const modalIndex = path.indexOf(`/${this.container.options.modalUriString}/`);
 
         if (modalIndex > -1) {
             path = path.slice(0, modalIndex);
@@ -179,25 +182,23 @@ export class Route {
         return path;
     }
 
-    public match: TMatch = (originalPath: string) => {
-        const path = this.pathWithoutModal(originalPath);
-        const pathParts = path.split("/");
-        const childPath = pathParts[0];
+    public match: TMatch = () => {
+        const path = this.pathWithoutModal(this.pathFormatter(this.pathName));
 
         // it's this one
-        if (this.path == childPath) {
+        if (this.formattedFullPath == path) {
             return this;
         }
         // some of children?
         else if (this.children != undefined) {
             for (const child of this.children) {
-                if (child.path == childPath) {
+                if (path.indexOf(child.formattedFullPath) == 0) {
                     // if no child part of url exist, this is our result
-                    if (pathParts.length == 1) {
+                    if (path.split("/").length == 2) {
                         return child;
                     }
                     else {
-                        return child.match(pathParts.slice(1).join("/"));
+                        return child.match();
                     }
                 }
             }
@@ -218,11 +219,25 @@ export class Route {
     }
 
     public pathFormatter(path: string): string {
-        return "#" + path;
+        if (this.container.options.hashPaths) {
+            return "#" + path;
+        }
+        return path;
+    }
+
+    public pathDeformatter(path: string): string {
+        if (this.container.options.hashPaths) {
+            return path.replace("#/", "");
+        }
+        return path;
     }
 
     // navigation
     public get active(): boolean {
+        if (this.isExternal) {
+            return false;
+        }
+
         return this.fullPath == this.pathWithoutModal(this.pathName);
     }
 
@@ -231,47 +246,37 @@ export class Route {
     }
 
     public get pathName(): string {
-        return this.location.href.slice(this.location.origin.length).replace("/#", "");
+        return this.pathDeformatter(this.location.href.slice(this.location.origin.length));
     }
 
-    public _open(path: string): void {
-        this.location.href = path;
-    }
-
-    public open(path?: string): boolean {
-        if (path == undefined) {
-            if (this.isExternal) {
-                this.location.href = this.path;
-                return true;
-            }
-
-            this._open(this.formattedFullPath);
+    public open(event?: React.MouseEvent<any>): boolean {
+        if (this.isExternal) {
+            this.location.href = this.path;
+            return true;
         }
-        else {
-            this._open(this.pathFormatter(path));
+
+        if (event != undefined) {
+            event.preventDefault();
         }
+
+        window.history.pushState("", "", this.formattedFullPath);
 
         this.render();
 
         return false;
     }
 
-    public _replace(path: string): void {
-        this.location.replace(path);
-    }
-
-    public replace(path?: string): boolean {
-        if (path == undefined) {
-            if (this.isExternal) {
-                this.location.href = this.path;
-                return true;
-            }
-
-            this._replace(this.formattedFullPath);
+    public replace(event?: React.MouseEvent<any>): boolean {
+        if (this.isExternal) {
+            this.location.href = this.path;
+            return true;
         }
-        else {
-            this._replace(this.pathFormatter(path));
+
+        if (event != undefined) {
+            event.preventDefault();
         }
+
+        window.history.replaceState("", "", this.formattedFullPath);
 
         this.render();
 
@@ -279,7 +284,7 @@ export class Route {
     }
 
     // modals
-    public matchModal(machineName: string): undefined | IModalOptions {
+    public matchModal(machineName: string): undefined | ModalRoute {
         if (this.modals != undefined) {
             for (const modal of this.modals) {
                 if (modal.machineName == machineName) {
@@ -299,23 +304,32 @@ export class Route {
         }
     }
 
-    private get openedModalIndexOfMachineNameInPath(): number {
-        return this.pathName.indexOf(`/${MODAL_URI_STRING}`);
+    public get indexOfModalUri(): number {
+        return this.pathName.indexOf(`/${this.container.options.modalUriString}/`);
     }
 
-    public get openedModal(): undefined | IModalOptions {
-        if (this.openedModalIndexOfMachineNameInPath > -1) {
-            return this.top.matchModal(this.pathName.slice(this.openedModalIndexOfMachineNameInPath + 2 + MODAL_URI_STRING.length));
+    public get formatterPathNameWithoutModal(): string {
+        if (this.indexOfModalUri > -1) {
+            return this.pathFormatter(this.pathName.slice(0, this.indexOfModalUri));
+        }
+        return this.pathFormatter(this.pathName);
+    }
+
+    public get openedModalMachineName(): string | undefined {
+        if (this.indexOfModalUri > -1) {
+            return this.pathName.slice(this.indexOfModalUri + 2 + this.container.options.modalUriString.length);
         }
     }
 
-    public closeModal(): void {
-        this.open();
+    public get openedModal(): undefined | ModalRoute {
+        if (this.openedModalMachineName != undefined) {
+            return this.topRoute.matchModal(this.openedModalMachineName);
+        }
     }
 
     // render
     public render(): void {
-        let routeToRender = this.top.match(location.hash);
+        let routeToRender = this.topRoute.match();
 
         if (routeToRender == undefined) {
             routeToRender = this.notFound;
