@@ -5,6 +5,7 @@ import { PageConstructor } from "./Page";
 import { LayoutConstructor, Layout } from "./Layout";
 import { Container } from "./Container";
 import { IModalRouteOptions, ModalRoute } from "./ModalRoute";
+import { Role } from "./Roles";
 
 type TMatch = () => Route | undefined;
 
@@ -17,7 +18,8 @@ export class RouteOptions implements IRouteOptions {
     public match?: TMatch;
     public children?: Array<IRouteOptions>;
     public modals?: Array<IModalRouteOptions>;
-    public notFound?: IRouteOptions;
+    public notFoundRoute?: IRouteOptions;
+    public unauthorizedRoute?: IRouteOptions;
     public container?: Container;
     public parent?: Route;
     public topRoute?: Route;
@@ -39,8 +41,10 @@ export interface IRouteOptions {
     component?: PageConstructor;
     match?: TMatch;
     children?: Array<IRouteOptions>;
+    notFoundRoute?: IRouteOptions;
+    unauthorizedRoute?: IRouteOptions;
+    roles?: Array<Role>;
     modals?: Array<IModalRouteOptions>;
-    notFound?: IRouteOptions;
 }
 
 export interface ITopRouteOptions {
@@ -63,6 +67,7 @@ export class Route {
         this.isExternal = options.isExternal;
         this.path = options.path;
         this.title = options.title;
+        this.roles = options.roles;
 
         const getter = (key: keyof (IRouteOptions & IChildrenRouteOptions & ITopRouteOptions), value: any) => {
             if (value != undefined) {
@@ -105,17 +110,28 @@ export class Route {
         }
 
         // not found
-        if (options.notFound == undefined) {
-            inherit("notFound");
+        if (options.notFoundRoute == undefined) {
+            inherit("notFoundRoute");
         }
         else {
-            const notFound = options.notFound as IRouteOptions & IChildrenRouteOptions;
-            notFound.parent = this;
-            this.notFound = new Route(notFound);
+            const notFoundRoute = options.notFoundRoute as IRouteOptions & IChildrenRouteOptions;
+            notFoundRoute.parent = this;
+            this.notFoundRoute = new Route(notFoundRoute);
         }
 
+        // unauthorized
+        if (options.unauthorizedRoute == undefined) {
+            inherit("unauthorizedRoute");
+        }
+        else {
+            const unauthorizedRoute = options.unauthorizedRoute as IRouteOptions & IChildrenRouteOptions;
+            unauthorizedRoute.parent = this;
+            this.unauthorizedRoute = new Route(unauthorizedRoute);
+        }
+
+        // match
         if (options.match != undefined) {
-            this.match = options.match;
+            this._match = options.match;
         }
 
         // children
@@ -139,7 +155,8 @@ export class Route {
                         title: modal.title,
                         component: modal.component,
                         container: this.container,
-                        topRoute: this.topRoute
+                        topRoute: this.topRoute,
+                        roles: modal.roles
                     });
                 }
             )
@@ -153,7 +170,9 @@ export class Route {
     public component?: PageConstructor;
     public children?: Array<Route>;
     public modals?: Array<ModalRoute>;
-    public notFound: Route;
+    public notFoundRoute: Route;
+    public unauthorizedRoute: Route;
+    public roles?: Array<Role>;
 
     public get topRoute(): Route {
         return this;
@@ -182,8 +201,21 @@ export class Route {
         return path;
     }
 
+    private _match?: TMatch;
+
     public match: TMatch = () => {
-        const path = this.pathWithoutModal(this.pathFormatter(this.pathName));
+        if (this._match != undefined) {
+            const result = this._match();
+            if (result != undefined) {
+                return result;
+            }
+        }
+
+        let path = this.pathWithoutModal(this.pathFormatter(this.pathName));
+
+        if (path == "") {
+            path = "/";
+        }
 
         // it's this one
         if (this.formattedFullPath == path) {
@@ -287,7 +319,7 @@ export class Route {
     public matchModal(machineName: string): undefined | ModalRoute {
         if (this.modals != undefined) {
             for (const modal of this.modals) {
-                if (modal.machineName == machineName) {
+                if (modal.machineName == machineName && this.container.hasRole(modal.roles)) {
                     return modal;
                 }
                 else {
@@ -331,10 +363,17 @@ export class Route {
     public render(): void {
         let routeToRender = this.topRoute.match();
 
+        // not found
         if (routeToRender == undefined) {
-            routeToRender = this.notFound;
+            routeToRender = this.notFoundRoute;
         }
 
+        // authorization
+        if (!this.container.hasRole(routeToRender.roles)) {
+            routeToRender = this.unauthorizedRoute;
+        }
+
+        // no component defined
         if (routeToRender.component == undefined) {
             return;
         }

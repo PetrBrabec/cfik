@@ -3,11 +3,14 @@ import * as React from "react";
 import { Container } from "./Container";
 import { ModalConstructor } from "./Modal";
 import { Route } from "./Route";
+import { Role } from "./Roles";
 
 export class ModalRouteOptions implements IModalRouteOptions {
     public machineName: string;
     public title: string;
     public component: ModalConstructor;
+    public roles?: Array<Role>;
+
     public container: Container;
     public topRoute: Route;
 }
@@ -16,6 +19,7 @@ export interface IModalRouteOptions {
     machineName: string;
     title: string;
     component: ModalConstructor;
+    roles?: Array<Role>;
 }
 
 export class ModalRoute {
@@ -28,6 +32,7 @@ export class ModalRoute {
         this.component = options.component;
         this.machineName = options.machineName;
         this.title = options.title;
+        this.roles = options.roles;
 
         const getter = (key: keyof ModalRouteOptions, value: any) => {
             if (value != undefined) {
@@ -45,10 +50,12 @@ export class ModalRoute {
         getter("container", o.container);
     }
 
-    public container: Container;
-    public title: string;
     public machineName: string;
+    public title: string;
     public component: ModalConstructor;
+    public roles?: Array<Role>;
+
+    public container: Container;
     public topRoute: Route;
 
     public get modalPath(): string {
@@ -56,7 +63,7 @@ export class ModalRoute {
     }
 
     public get formattedFullPath(): string {
-        return this.topRoute.formatterPathNameWithoutModal + this.modalPath;
+        return (this.topRoute.formatterPathNameWithoutModal == "/" ? "" : this.topRoute.formatterPathNameWithoutModal) + this.modalPath;
     }
 
     // navigation
@@ -89,7 +96,7 @@ export class ModalRoute {
     }
 
     public close(): void {
-        window.history.replaceState("", "", this.topRoute.formatterPathNameWithoutModal);
+        window.history.replaceState("", "", this.topRoute.formatterPathNameWithoutModal != "" ? this.topRoute.formatterPathNameWithoutModal : "/");
         this.topRoute.render();
     }
 }

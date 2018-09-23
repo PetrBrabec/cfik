@@ -32,8 +32,8 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
         const route = this.props.route;
 
         return (
-            <main className={(this.props.className != undefined ? this.props.className + " " : "") + style(csstips.fillParent)}>
-                <RS.Navbar color="light" light expand="lg">
+            <main className={(this.props.className != undefined ? this.props.className + " " : "") + style({ marginTop: 56 })}>
+                <RS.Navbar color="light" light expand="lg" fixed={"top"}>
                     <RS.NavbarBrand href={route.topRoute.formattedFullPath} onClick={route.topRoute.open}>{route.container.options.name}</RS.NavbarBrand>
 
                     <RS.NavbarToggler onClick={this.toggleNavigation.bind(this)} />
@@ -44,6 +44,10 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
                                 route.topRoute.children != undefined
                                     ? route.topRoute.children.reduce(
                                         (menuItems, route, i) => {
+                                            if (!route.container.hasRole(route.roles)) {
+                                                return menuItems;
+                                            }
+
                                             if (route.children != undefined && route.children.length > 0) {
                                                 menuItems.push(
                                                     <RS.UncontrolledDropdown
@@ -99,9 +103,13 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
                             }
                             {
                                 route.topRoute.modals != undefined
-                                    ? route.topRoute.modals.map(
-                                        (modal, i) =>
-                                            (
+                                    ? route.topRoute.modals.reduce(
+                                        (menuItems, modal, i) => {
+                                            if (!route.container.hasRole(modal.roles)) {
+                                                return menuItems;
+                                            }
+
+                                            menuItems.push(
                                                 <RS.NavItem
                                                     key={`mainRouteNavItemModal${i}`}
                                                 >
@@ -110,7 +118,27 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
                                                         onClick={modal.open}
                                                     >{modal.title}</RS.NavLink>
                                                 </RS.NavItem>
-                                            )
+                                            );
+
+                                            return menuItems;
+                                        },
+                                        new Array<JSX.Element>()
+                                    )
+                                    : null
+                            }
+
+                            {
+                                // logout
+                                !route.container.isSignedIn()
+                                    ? (
+                                        <RS.NavItem
+                                            key={`mainRouteNavItemLogout`}
+                                        >
+                                            <RS.NavLink
+                                                href={route.topRoute.formattedFullPath}
+                                                onClick={(e: React.MouseEvent<any>) => { e.preventDefault(); route.container.signout(); return false; }}
+                                            >💤</RS.NavLink>
+                                        </RS.NavItem>
                                     )
                                     : null
                             }
