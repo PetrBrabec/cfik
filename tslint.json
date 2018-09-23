@@ -1,6 +1,14 @@
 {
     "extends": "tslint:recommended",
     "rules": {
-        "ordered-imports": true
+        "ordered-imports": [
+            true,
+            {
+                "grouped-imports": true,
+                "import-sources-order": "lowercase-first",
+                "named-imports-order": "lowercase-first",
+                "module-source-path": "full"
+            }
+        ]
     }
 }

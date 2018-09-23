@@ -1,7 +1,7 @@
 {
   "name": "cfik",
-  "version": "1.0.1",
-  "description": "Project boiler plate.",
+  "version": "1.0.2",
+  "description": "Framework for (yet) basic websites.",
   "repository": {
     "type": "git",
     "url": "https://petr_brabec@bitbucket.org/petr_brabec/cfik.git"
