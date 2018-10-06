@@ -1,6 +1,5 @@
 {
     "compilerOptions": {
-        "outDir": "./",
         "sourceMap": true,
         "noImplicitAny": true,
         "target": "es6",
@@ -11,9 +10,7 @@
         ],
         "jsx": "react",
         "experimentalDecorators": true,
-        "emitDecoratorMetadata": true
-    },
-    "exclude": [
-        "./node_modules/**/*"
-    ]
+        "emitDecoratorMetadata": true,
+        "skipLibCheck": true
+    }
 }

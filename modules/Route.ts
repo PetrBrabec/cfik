@@ -14,7 +14,7 @@ export class RouteOptions<TRole> implements TAllRouteOptions<TRole> {
     public title: string;
     public path?: string;
 
-    public layout?: LayoutConstructor<TRole> | boolean;
+    public layout?: LayoutConstructor | boolean;
     public component?: PageConstructor;
 
     public match?: TMatch<TRole>;
@@ -50,7 +50,7 @@ export interface IRouteOptions<TRole> {
     title: string;
     path?: string;
 
-    layout?: LayoutConstructor<TRole> | boolean;
+    layout?: LayoutConstructor | boolean;
     component?: PageConstructor;
 
     match?: TMatch<TRole>;
@@ -189,8 +189,8 @@ export class Route<TRole = Role> {
     public container: Container<TRole>;
     public title: string;
     public isExternal?: boolean;
-    public layout?: LayoutConstructor<TRole>;
-    public component?: PageConstructor;
+    public layout?: LayoutConstructor;
+    public component?: PageConstructor<{}, {}, TRole>;
     public children?: Array<Route<TRole>>;
     public modals?: Array<ModalRoute<TRole>>;
     public actions?: Array<IActionOptions<TRole>>;
