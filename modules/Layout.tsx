@@ -8,12 +8,12 @@ import { Helmet } from "react-helmet";
 import { Route } from "./Route";
 
 export interface LayoutConstructor {
-    new(props: Readonly<ILayoutProps>, route: Route): Layout;
+    new(props: Readonly<any>): Layout<any>;
 }
 
-interface ILayoutProps {
+interface ILayoutProps<TRole> {
     className?: string;
-    route: Route;
+    route: Route<TRole>;
     children: JSX.Element;
 }
 
@@ -21,7 +21,7 @@ interface ILayoutState {
     isNavigationOpened: boolean;
 }
 @observer
-export class Layout extends React.Component<ILayoutProps, ILayoutState> {
+export class Layout<TRole = Role> extends React.Component<ILayoutProps<TRole>, ILayoutState> {
     public state: ILayoutState = { isNavigationOpened: false };
 
     public toggleNavigation() {
@@ -44,7 +44,7 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
                                 route.topRoute.children != undefined
                                     ? route.topRoute.children.reduce(
                                         (menuItems, route, i) => {
-                                            if (!route.container.hasRole(route.roles)) {
+                                            if (!route.container.user.hasRoles(route.roles)) {
                                                 return menuItems;
                                             }
 
@@ -101,11 +101,12 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
                                     )
                                     : null
                             }
+
                             {
                                 route.topRoute.modals != undefined
                                     ? route.topRoute.modals.reduce(
                                         (menuItems, modal, i) => {
-                                            if (!route.container.hasRole(modal.roles)) {
+                                            if (!route.container.user.hasRoles(modal.roles)) {
                                                 return menuItems;
                                             }
 
@@ -128,27 +129,33 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
                             }
 
                             {
-                                // logout
-                                !route.container.isSignedIn()
-                                    ? (
-                                        <RS.NavItem
-                                            key={`mainRouteNavItemLogout`}
-                                        >
-                                            <RS.NavLink
-                                                href={route.topRoute.formattedFullPath}
-                                                onClick={(e: React.MouseEvent<any>) => { e.preventDefault(); route.container.signout(); return false; }}
-                                            >💤</RS.NavLink>
-                                        </RS.NavItem>
+                                route.topRoute.actions != undefined
+                                    ? route.topRoute.actions.reduce(
+                                        (menuItems, action, i) => {
+                                            if (!route.container.user.hasRoles(action.roles)) {
+                                                return menuItems;
+                                            }
+
+                                            menuItems.push(
+                                                <RS.Form
+                                                    inline
+                                                    key={`mainRouteNavItemAction${i}`}
+                                                >
+                                                    <RS.Button
+                                                        onClick={action.onClick}
+                                                    >{action.title}</RS.Button>
+                                                </RS.Form>
+                                            );
+
+                                            return menuItems;
+                                        },
+                                        new Array<JSX.Element>()
                                     )
                                     : null
                             }
                         </RS.Nav>
                     </RS.Collapse>
                 </RS.Navbar>
-
-                <Helmet
-                    title={route.title}
-                />
 
                 {
                     route.openedModal != undefined

@@ -2,13 +2,14 @@ import * as React from "react";
 import { action } from "mobx";
 import { observer } from "mobx-react";
 import { ModalRoute } from "./ModalRoute";
+import { Role } from "./Role";
 
-export interface ModalConstructor {
-    new(props: Readonly<ModalProps>): Modal;
+export interface ModalConstructor<TRole> {
+    new(props: Readonly<ModalProps<TRole>>): Modal<TRole>;
 }
 
-interface ModalProps {
-    modalRoute: ModalRoute,
+interface ModalProps<TRole> {
+    modalRoute: ModalRoute<TRole>,
 }
 
 interface ModalState {
@@ -16,8 +17,8 @@ interface ModalState {
 }
 
 @observer
-export class Modal extends React.Component<ModalProps, ModalState> {
-    public constructor(props: Readonly<ModalProps>) {
+export class Modal<TRole = Role> extends React.Component<ModalProps<TRole>, ModalState> {
+    public constructor(props: Readonly<ModalProps<TRole>>) {
         super(props);
         this.close = this.close.bind(this);
     }

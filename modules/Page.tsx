@@ -1,16 +1,16 @@
 import * as React from "react";
 import { Route } from "./Route";
 
-export interface PageConstructor {
-    new(props: Readonly<PageProps>): Page;
+export interface PageConstructor<TProps, TState> {
+    new(props: Readonly<TProps & PageProps>): Page<TProps, TState>;
 }
 
-interface PageProps {
+export interface PageProps {
     route: Route
 }
 
-export class Page extends React.Component<PageProps, {}> {
-    public constructor(props: Readonly<PageProps>) {
+export class Page<TProps, TState = {}> extends React.Component<TProps & PageProps, TState> {
+    public constructor(props: Readonly<TProps & PageProps>) {
         super(props);
     }
 }

@@ -1,26 +1,15 @@
+import { Container as InvContainer } from "inversify";
 import { setupPage, normalize } from "csstips";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 import { IRouteOptions, Route, ITopRouteOptions } from "./Route";
-import { Role } from "./Roles";
+import { Role } from "./Role";
+import { User } from "./User";
 
-interface IContainerOptions {
-    name: string;
-    machineName: string;
+interface IContainerOptions<TRole> extends ContainerOptions<TRole> { }
 
-    hashPaths?: boolean;
-    entryElementId?: string;
-    modalUriString?: string;
-
-    hasRole?: (roles: Array<Role>) => boolean;
-    isSignedIn?: () => boolean;
-    signout?: () => Promise<void>;
-
-    route: IRouteOptions;
-}
-
-class ContainerOptions implements IContainerOptions {
-    public constructor(options: IContainerOptions) {
+class ContainerOptions<TRole> implements IContainerOptions<TRole> {
+    public constructor(options: IContainerOptions<TRole>) {
         for (const key in options) {
             if (options[key] != undefined) {
                 this[key] = options[key]
@@ -29,36 +18,34 @@ class ContainerOptions implements IContainerOptions {
     }
 
     public name: string;
-    public machineName: string;
+    public machineName?: string;
 
-    public hashPaths: boolean = false;
-    public entryElementId: string = "app";
-    public modalUriString: string = "modal";
+    public hashPaths?: boolean = false;
+    public entryElementId?: string = "app";
+    public modalUriString?: string = "modal";
 
-    public hasRole?: (roles: Array<Role>) => boolean;
-    public isSignedIn?: () => boolean;
-    public signout?: () => Promise<void>;
-
-    public route: IRouteOptions;
+    public route?: IRouteOptions<TRole>;
+    public user?: User<TRole>;
 }
 
-export class Container {
-    public constructor(options: IContainerOptions) {
-        this.options = new ContainerOptions(options);
+export class Container<TRole = Role> {
+    public constructor(options: IContainerOptions<TRole>) {
+        this.options = new ContainerOptions<TRole>(options);
 
-        const topRouteOptions = Object.assign<IRouteOptions, ITopRouteOptions>(
+        const topRouteOptions = Object.assign<IRouteOptions<TRole>, ITopRouteOptions<TRole>>(
             this.options.route,
             {
+                title: this.options.route.title,
                 container: this
             }
         );
 
-        this.signout = this.signout.bind(this);
-
-        this.route = new Route(topRouteOptions);
+        this.route = new Route<TRole>(topRouteOptions);
 
         this.init();
     }
+
+    private _container: InvContainer;
 
     public async init(): Promise<void> {
         // styles
@@ -69,29 +56,15 @@ export class Container {
         this.route.render();
     }
 
-    public options: ContainerOptions;
+    public options: ContainerOptions<TRole>;
 
-    public route: Route;
+    public route: Route<TRole>;
 
-    // roles
-    public isSignedIn(): boolean {
-        if (this.options.isSignedIn != undefined) {
-            return this.options.isSignedIn();
-        }
-        return true;
+    public get user(): User<TRole> {
+        return this.options.user != undefined ? this.options.user : new User({ roles: [] });
     }
 
-    public async signout(): Promise<void> {
-        if (this.options.signout != undefined) {
-            await this.options.signout();
-            this.route.render();
-        }
-    }
-
-    public hasRole(roles?: Array<Role>): boolean {
-        if (roles != undefined && this.options.hasRole != undefined) {
-            return this.options.hasRole(roles);
-        }
-        return true;
+    public set user(user: User<TRole>) {
+        this.options.user = user;
     }
 }

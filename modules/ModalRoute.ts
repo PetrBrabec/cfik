@@ -3,28 +3,24 @@ import * as React from "react";
 import { Container } from "./Container";
 import { ModalConstructor } from "./Modal";
 import { Route } from "./Route";
-import { Role } from "./Roles";
+import { Role } from "./Role";
 
-export class ModalRouteOptions implements IModalRouteOptions {
+export interface IModalRouteOptions<TRole> extends ModalRouteOptions<TRole> { }
+
+export class ModalRouteOptions<TRole> implements IModalRouteOptions<TRole> {
     public machineName: string;
     public title: string;
-    public component: ModalConstructor;
-    public roles?: Array<Role>;
+    public component: ModalConstructor<TRole>;
+    public roles?: Array<TRole>;
+    public isVisible?: () => boolean;
 
-    public container: Container;
-    public topRoute: Route;
+    public container?: Container<TRole>;
+    public topRoute?: Route<TRole>;
 }
 
-export interface IModalRouteOptions {
-    machineName: string;
-    title: string;
-    component: ModalConstructor;
-    roles?: Array<Role>;
-}
-
-export class ModalRoute {
-    public constructor(options: ModalRouteOptions) {
-        const o = Object.assign(new ModalRouteOptions(), options);
+export class ModalRoute<TRole = Role> {
+    public constructor(options: ModalRouteOptions<TRole>) {
+        const o = Object.assign(new ModalRouteOptions<TRole>(), options);
 
         this.close = this.close.bind(this);
         this.open = this.open.bind(this);
@@ -34,7 +30,9 @@ export class ModalRoute {
         this.title = options.title;
         this.roles = options.roles;
 
-        const getter = (key: keyof ModalRouteOptions, value: any) => {
+        this.isVisible = options.isVisible != undefined ? options.isVisible.bind(this) : () => true;
+
+        const getter = (key: keyof ModalRouteOptions<TRole>, value: any) => {
             if (value != undefined) {
                 Object.defineProperty(
                     this,
@@ -52,11 +50,12 @@ export class ModalRoute {
 
     public machineName: string;
     public title: string;
-    public component: ModalConstructor;
-    public roles?: Array<Role>;
+    public component: ModalConstructor<TRole>;
+    public roles?: Array<TRole>;
+    public isVisible: () => boolean;
 
-    public container: Container;
-    public topRoute: Route;
+    public container: Container<TRole>;
+    public topRoute: Route<TRole>;
 
     public get modalPath(): string {
         return `/${this.container.options.modalUriString}/${this.machineName}`;

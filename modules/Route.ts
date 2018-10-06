@@ -5,71 +5,86 @@ import { PageConstructor } from "./Page";
 import { LayoutConstructor, Layout } from "./Layout";
 import { Container } from "./Container";
 import { IModalRouteOptions, ModalRoute } from "./ModalRoute";
-import { Role } from "./Roles";
+import { Role } from "./Role";
+import { IActionOptions } from "./Action";
 
-type TMatch = () => Route | undefined;
+type TMatch<TRole> = () => Route<TRole> | undefined;
 
-export class RouteOptions implements IRouteOptions {
-    public path: string;
+export class RouteOptions<TRole> implements TAllRouteOptions<TRole> {
     public title: string;
-    public isExternal?: boolean;
-    public layout?: LayoutConstructor | boolean;
-    public component: PageConstructor;
-    public match?: TMatch;
-    public children?: Array<IRouteOptions>;
-    public modals?: Array<IModalRouteOptions>;
-    public notFoundRoute?: IRouteOptions;
-    public unauthorizedRoute?: IRouteOptions;
-    public container?: Container;
-    public parent?: Route;
-    public topRoute?: Route;
+    public path?: string;
 
-    public isTopRoute(): this is ITopRouteOptions {
+    public layout?: LayoutConstructor<TRole> | boolean;
+    public component?: PageConstructor;
+
+    public match?: TMatch<TRole>;
+
+    public children?: Array<IChildrenRouteOptions<TRole>>;
+    public notFoundRoute?: IChildrenRouteOptions<TRole>;
+    public unauthorizedRoute?: IChildrenRouteOptions<TRole>;
+    public modals?: Array<IModalRouteOptions<TRole>>;
+    public actions?: Array<IActionOptions<TRole>>;
+
+    public topRoute?: Route<TRole>;
+
+    // top route
+    public container?: Container<TRole>;
+
+    // children route
+    public parent?: Route<TRole>;
+    public roles?: Array<TRole>;
+    public isExternal?: boolean;
+
+    public isTopRoute(): this is ITopRouteOptions<TRole> {
         return this.container != undefined;
     }
 
-    public isChildrenRoute(): this is IChildrenRouteOptions {
+    public isChildrenRoute(): this is IChildrenRouteOptions<TRole> {
         return this.parent != undefined;
     }
 }
 
-export interface IRouteOptions {
-    path: string;
+export type TAllRouteOptions<TRole> = ITopRouteOptions<TRole> & IChildrenRouteOptions<TRole>;
+
+export interface IRouteOptions<TRole> {
     title: string;
-    isExternal?: boolean;
-    layout?: LayoutConstructor | boolean;
+    path?: string;
+
+    layout?: LayoutConstructor<TRole> | boolean;
     component?: PageConstructor;
-    match?: TMatch;
-    children?: Array<IRouteOptions>;
-    notFoundRoute?: IRouteOptions;
-    unauthorizedRoute?: IRouteOptions;
-    roles?: Array<Role>;
-    modals?: Array<IModalRouteOptions>;
+
+    match?: TMatch<TRole>;
+
+    children?: Array<IChildrenRouteOptions<TRole>>;
+    notFoundRoute?: IChildrenRouteOptions<TRole>;
+    unauthorizedRoute?: IChildrenRouteOptions<TRole>;
+    modals?: Array<IModalRouteOptions<TRole>>;
+    actions?: Array<IActionOptions<TRole>>;
+
+    topRoute?: Route<TRole>;
 }
 
-export interface ITopRouteOptions {
-    container: Container;
+export interface ITopRouteOptions<TRole> extends IRouteOptions<TRole> {
+    container?: Container<TRole>;
 }
 
-export interface IChildrenRouteOptions {
-    parent: Route;
-    topRoute: Route;
+export interface IChildrenRouteOptions<TRole> extends IRouteOptions<TRole> {
+    parent?: Route<TRole>;
+    roles?: Array<TRole>;
+    isExternal?: boolean;
 }
 
-export class Route {
-    public constructor(options: (IRouteOptions & (IChildrenRouteOptions | ITopRouteOptions))) {
-        const o = Object.assign(new RouteOptions(), options);
+export class Route<TRole = Role> {
+    public constructor(_options: (IRouteOptions<TRole> & (IChildrenRouteOptions<TRole> | ITopRouteOptions<TRole>))) {
+        const options = Object.assign(new RouteOptions<TRole>(), _options);
 
-        this.render = this.render.bind(this);
-        this.open = this.open.bind(this);
-        this.replace = this.replace.bind(this);
-        this.component = options.component;
-        this.isExternal = options.isExternal;
-        this.path = options.path;
         this.title = options.title;
-        this.roles = options.roles;
+        this.path = options.path != undefined ? options.path : "";
 
-        const getter = (key: keyof (IRouteOptions & IChildrenRouteOptions & ITopRouteOptions), value: any) => {
+        this.component = options.component;
+        this.actions = options.actions;
+
+        const getter = (key: keyof (IRouteOptions<TRole> & IChildrenRouteOptions<TRole> & ITopRouteOptions<TRole>), value: any) => {
             if (value != undefined) {
                 Object.defineProperty(
                     this,
@@ -81,20 +96,23 @@ export class Route {
             }
         }
 
-        const inherit = (key: keyof (IRouteOptions & IChildrenRouteOptions & ITopRouteOptions)) => {
+        const inherit = (key: keyof (IRouteOptions<TRole> & IChildrenRouteOptions<TRole> & ITopRouteOptions<TRole>)) => {
             if (this.parent != undefined) {
                 getter(key, this.parent[key]);
             }
         }
 
-        if (o.isTopRoute()) {
-            this.container = o.container;
+        if (options.isTopRoute()) {
+            this.container = options.container;
             this.fullPath = "/" + this.path;
         }
-        else if (o.isChildrenRoute()) {
-            getter("parent", o.parent);
+
+        if (options.isChildrenRoute()) {
+            getter("parent", options.parent);
             inherit("topRoute");
             inherit("container");
+            this.isExternal = options.isExternal;
+            this.roles = options.roles;
             this.fullPath = this.parent.fullPath + (this.parent.fullPath == "/" ? "" : "/") + this.path;
         }
 
@@ -114,7 +132,7 @@ export class Route {
             inherit("notFoundRoute");
         }
         else {
-            const notFoundRoute = options.notFoundRoute as IRouteOptions & IChildrenRouteOptions;
+            const notFoundRoute = options.notFoundRoute as IRouteOptions<TRole> & IChildrenRouteOptions<TRole>;
             notFoundRoute.parent = this;
             this.notFoundRoute = new Route(notFoundRoute);
         }
@@ -124,7 +142,7 @@ export class Route {
             inherit("unauthorizedRoute");
         }
         else {
-            const unauthorizedRoute = options.unauthorizedRoute as IRouteOptions & IChildrenRouteOptions;
+            const unauthorizedRoute = options.unauthorizedRoute as IRouteOptions<TRole> & IChildrenRouteOptions<TRole>;
             unauthorizedRoute.parent = this;
             this.unauthorizedRoute = new Route(unauthorizedRoute);
         }
@@ -137,7 +155,7 @@ export class Route {
         // children
         if (options.children != undefined) {
             this.children = options.children.map(
-                (child: IRouteOptions & IChildrenRouteOptions) => {
+                (child: IRouteOptions<TRole> & IChildrenRouteOptions<TRole>) => {
                     child.parent = this;
                     child.topRoute = this.topRoute;
 
@@ -150,35 +168,41 @@ export class Route {
         if (options.modals != undefined) {
             this.modals = options.modals.map(
                 (modal) => {
-                    return new ModalRoute({
+                    return new ModalRoute<TRole>({
                         machineName: modal.machineName,
                         title: modal.title,
                         component: modal.component,
                         container: this.container,
                         topRoute: this.topRoute,
-                        roles: modal.roles
+                        roles: modal.roles,
+                        isVisible: modal.isVisible
                     });
                 }
             )
         }
+
+        this.render = this.render.bind(this);
+        this.open = this.open.bind(this);
+        this.replace = this.replace.bind(this);
     }
 
-    public container: Container;
+    public container: Container<TRole>;
     public title: string;
     public isExternal?: boolean;
-    public layout?: LayoutConstructor;
+    public layout?: LayoutConstructor<TRole>;
     public component?: PageConstructor;
-    public children?: Array<Route>;
-    public modals?: Array<ModalRoute>;
-    public notFoundRoute: Route;
-    public unauthorizedRoute: Route;
-    public roles?: Array<Role>;
+    public children?: Array<Route<TRole>>;
+    public modals?: Array<ModalRoute<TRole>>;
+    public actions?: Array<IActionOptions<TRole>>;
+    public notFoundRoute: Route<TRole>;
+    public unauthorizedRoute: Route<TRole>;
+    public roles?: Array<TRole>;
 
-    public get topRoute(): Route {
+    public get topRoute(): Route<TRole> {
         return this;
     }
 
-    public get parent(): undefined | Route {
+    public get parent(): undefined | Route<TRole> {
         return undefined;
     }
 
@@ -201,9 +225,9 @@ export class Route {
         return path;
     }
 
-    private _match?: TMatch;
+    private _match?: TMatch<TRole>;
 
-    public match: TMatch = () => {
+    public match: TMatch<TRole> = () => {
         if (this._match != undefined) {
             const result = this._match();
             if (result != undefined) {
@@ -316,10 +340,10 @@ export class Route {
     }
 
     // modals
-    public matchModal(machineName: string): undefined | ModalRoute {
+    public matchModal(machineName: string): undefined | ModalRoute<TRole> {
         if (this.modals != undefined) {
             for (const modal of this.modals) {
-                if (modal.machineName == machineName && this.container.hasRole(modal.roles)) {
+                if (modal.machineName == machineName && this.container.user.hasRoles(modal.roles)) {
                     return modal;
                 }
                 else {
@@ -353,7 +377,7 @@ export class Route {
         }
     }
 
-    public get openedModal(): undefined | ModalRoute {
+    public get openedModal(): undefined | ModalRoute<TRole> {
         if (this.openedModalMachineName != undefined) {
             return this.topRoute.matchModal(this.openedModalMachineName);
         }
@@ -369,7 +393,7 @@ export class Route {
         }
 
         // authorization
-        if (!this.container.hasRole(routeToRender.roles)) {
+        if (!this.container.user.hasRoles(routeToRender.roles)) {
             routeToRender = this.unauthorizedRoute;
         }
 
