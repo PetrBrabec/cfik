@@ -227,7 +227,8 @@ export class Route<TRole = Role> {
 
     private _match?: TMatch<TRole>;
 
-    public match: TMatch<TRole> = () => {
+    public match: TMatch<TRole> = () => 
+    {
         if (this._match != undefined) {
             const result = this._match();
             if (result != undefined) {
@@ -235,31 +236,36 @@ export class Route<TRole = Role> {
             }
         }
 
-        let path = this.pathWithoutModal(this.pathFormatter(this.pathName));
+        let pathname = this.pathWithoutModal(this.pathFormatter(this.pathName));
 
-        if (path == "") {
-            path = "/";
+        if (pathname == "") {
+            pathname = "/";
         }
 
+        return this.findRoute(pathname);
+    };
+
+    public findRoute(formattedFullPath: string): Route<TRole> | undefined
+    {
         // it's this one
-        if (this.formattedFullPath == path) {
+        if (this.formattedFullPath == formattedFullPath) {
             return this;
         }
         // some of children?
         else if (this.children != undefined) {
             for (const child of this.children) {
-                if (path.indexOf(child.formattedFullPath) == 0) {
+                if (formattedFullPath.indexOf(child.formattedFullPath) == 0) {
                     // if no child part of url exist, this is our result
-                    if (path.split("/").length == 2) {
+                    if (formattedFullPath.split("/").length == 2) {
                         return child;
                     }
                     else {
-                        return child.match();
+                        return child.findRoute(formattedFullPath);
                     }
                 }
             }
         }
-    };
+    }
 
     // path
     public path: string;
