@@ -1,6 +1,5 @@
 import { Container as InvContainer } from "inversify";
 import { setupPage, normalize } from "csstips";
-import "bootstrap/dist/css/bootstrap.min.css";
 
 import { IRouteOptions, Route, ITopRouteOptions } from "./Route";
 import { Role } from "./Role";
